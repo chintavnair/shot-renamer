@@ -20,6 +20,96 @@ python3 -m venv .venv
 The first transcription downloads the Whisper model (~460 MB for `small.en`)
 into `~/.cache/huggingface`.
 
+## Install on macOS
+
+Runs on Apple Silicon and Intel with macOS 11+ (Sonoma or newer resolves the
+newest wheels). There is no GPU path — CUDA does not exist on macOS, so it
+transcribes on CPU: a few seconds per take. Neither `ffmpeg` nor a suitable
+Python ships with macOS, so both need installing first.
+
+### 1. Check the basics
+
+```sh
+uname -m                  # arm64 = Apple Silicon, x86_64 = Intel
+sw_vers -productVersion
+python3 --version         # macOS's built-in python3 is 3.9 — too old
+ffmpeg -version
+```
+
+You need **Python 3.10 or newer** and **ffmpeg**.
+
+### 2. Install ffmpeg and Python
+
+**With Homebrew** (easiest; Homebrew itself asks for an admin password once):
+
+```sh
+brew install ffmpeg python@3.12
+```
+
+On Apple Silicon, make sure Homebrew is on `PATH` in new shells:
+
+```sh
+echo 'eval "$(brew shellenv)"' >> ~/.zprofile
+```
+
+**Without admin rights** — micromamba keeps Python and ffmpeg entirely in your
+home directory:
+
+```sh
+curl -Ls https://micro.mamba.pm/api/micromamba/osx-arm64/latest | tar -xvj bin/micromamba
+./bin/micromamba create -y -p ~/slate -c conda-forge python=3.12 ffmpeg
+```
+
+Use `osx-64` instead of `osx-arm64` on an Intel Mac. Then substitute
+`~/slate/bin/python` and `~/slate/bin/shot-renamer` for the paths below. (The
+official python.org installer works too, but ffmpeg still needs a separate
+download.)
+
+### 3. Install shot-renamer
+
+```sh
+git clone https://github.com/<your-user>/shot-renamer.git
+cd shot-renamer
+python3.12 -m venv .venv
+.venv/bin/pip install -e .
+```
+
+The CLI lands at `.venv/bin/shot-renamer`. Run `source .venv/bin/activate` if
+you would rather type the bare command.
+
+### 4. Fetch the model once
+
+The first transcription downloads `small.en` (~460 MB) into
+`~/.cache/huggingface`. If the campus network blocks HuggingFace, copy that
+directory from a machine that already has it and the tool runs offline:
+
+```sh
+rsync -a other-machine:~/.cache/huggingface/ ~/.cache/huggingface/
+```
+
+### 5. First run
+
+```sh
+.venv/bin/shot-renamer ~/Movies/takes --show-transcript   # dry run
+.venv/bin/shot-renamer ~/Movies/takes --apply             # commit
+```
+
+macOS will ask for permission the first time Terminal reads Desktop,
+Documents, Downloads or an external drive. Allow it, or the tool sees an empty
+folder.
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `ffmpeg: command not found` | Homebrew is not on `PATH` — add `eval "$(brew shellenv)"` to `~/.zprofile` and open a new terminal |
+| `bad CPU type in executable` | Intel Homebrew in `/usr/local` mixed with an arm64 Python; install both for the same architecture |
+| `No module named pip` | `.venv/bin/python -m ensurepip --upgrade` |
+| `command not found: shot-renamer` | Use `.venv/bin/shot-renamer`, or activate the venv first |
+| Model download hangs | Use the cache copy above; the tool then runs offline |
+| Empty file list or `Permission denied` | System Settings → Privacy & Security → Files and Folders: grant Terminal access |
+| `operation not permitted` on a hand-downloaded ffmpeg | `xattr -d com.apple.quarantine /path/to/ffmpeg` |
+
 ## Use
 
 ```sh
@@ -89,32 +179,6 @@ Every file gets a status: `renamed`/`would-rename`, `already-named`, `no-slate`,
 It runs on CPU and CUDA without PyTorch, loads once per batch, and accepts raw
 samples, so nothing is written to disk. `--device auto` probes for CUDA and
 falls back to CPU with a warning if the system CUDA libraries are missing.
-
-## macOS
-
-Runs on Apple Silicon and Intel with macOS 11+, CPU only (the CUDA probe falls
-back to CPU silently). Neither `ffmpeg` nor Python ships with macOS:
-
-```sh
-brew install ffmpeg python@3.12
-python3.12 -m venv .venv
-.venv/bin/pip install -e .
-```
-
-`pip` resolves the newest wheels your macOS supports; on Intel or pre-Sonoma
-machines that means slightly older `onnxruntime`/`av` builds, which work the
-same.
-
-Without admin rights, micromamba gives a self-contained environment:
-
-```sh
-curl -Ls https://micro.mamba.pm/api/micromamba/osx-arm64/latest | tar -xvj bin/micromamba
-./bin/micromamba create -y -p ~/slate -c conda-forge python=3.12 ffmpeg
-~/slate/bin/python -m pip install -e .
-```
-
-The model lives in `~/.cache/huggingface` (~460 MB on first run). Copy that
-directory from another machine to avoid downloading it over a campus network.
 
 ## Development
 
