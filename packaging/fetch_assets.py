@@ -30,7 +30,11 @@ MAC_URL = "https://ffmpeg.martin-riedl.de/redirect/latest/macos/{arch}/release/{
 
 def _download(url: str, destination: Path) -> None:
     print(f"downloading {url}")
-    urllib.request.urlretrieve(url, destination)
+    # Some mirrors reject Python's default user agent with a 403.
+    request = urllib.request.Request(url, headers={"User-Agent": "shot-renamer-packaging/0.1"})
+    with urllib.request.urlopen(request, timeout=120) as response:
+        with destination.open("wb") as handle:
+            shutil.copyfileobj(response, handle)
 
 
 def fetch_ffmpeg(bin_dir: Path) -> None:
