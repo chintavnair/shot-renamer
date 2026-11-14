@@ -26,6 +26,7 @@ MODELS = {
 
 LINUX_URL = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-{arch}-static.tar.xz"
 MAC_URL = "https://ffmpeg.martin-riedl.de/redirect/latest/macos/{arch}/release/{tool}.zip"
+LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.txt"
 
 
 def _download(url: str, destination: Path) -> None:
@@ -74,6 +75,8 @@ def fetch_ffmpeg(bin_dir: Path) -> None:
             (bin_dir / "SOURCE.txt").write_text(
                 "Static build from https://ffmpeg.martin-riedl.de/\n"
             )
+            # Those builds are GPL; ship the licence text alongside.
+            _download(LICENSE_URL, bin_dir / "GPLv3.txt")
 
         else:
             raise SystemExit(f"unsupported build platform: {system}")

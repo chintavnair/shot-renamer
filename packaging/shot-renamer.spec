@@ -28,7 +28,10 @@ for tool in ("ffmpeg", "ffprobe"):
     binaries.append((str(vendor / "bin" / tool), "."))
 
 datas.append((str(vendor / "models"), "models"))
-datas.append((str(vendor / "bin" / "GPLv3.txt"), "licenses"))
+
+# Whatever the platform's build shipped: licence text and provenance.
+for note in sorted((vendor / "bin").glob("*.txt")):
+    datas.append((str(note), "licenses"))
 
 analysis = Analysis(
     [str(root / "packaging" / "entry.py")],
