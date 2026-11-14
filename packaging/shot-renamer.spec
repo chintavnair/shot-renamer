@@ -6,6 +6,7 @@ shotrenamer.resources), the model under models/, and the Python runtime plus
 native libraries under _internal/.
 """
 
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all
@@ -56,7 +57,8 @@ COLLECT(
     exe,
     analysis.binaries,
     analysis.datas,
-    strip=True,
+    # Stripping invalidates code signatures on macOS.
+    strip=sys.platform != "darwin",
     upx=False,
     name="shot-renamer",
 )
