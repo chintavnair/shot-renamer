@@ -40,17 +40,33 @@ jobs:
 
       - name: Smoke test
         run: |
-          ./dist/shot-renamer/shot-renamer --help > /dev/null
+          # Two runs: low-level noise goes through the model (proving the
+          # bundled weights load on this platform), digital silence must be
+          # rejected before ASR so no slate is invented.
           python - <<'EOF'
+          import random
           import wave
-          with wave.open("smoke.wav", "wb") as handle:
-              handle.setnchannels(1)
-              handle.setsampwidth(2)
-              handle.setframerate(16000)
-              handle.writeframes(b"\x00\x00" * 16000)
+
+          random.seed(0)
+          for name, sample in (
+              ("noise.wav", lambda: random.randint(-320, 320)),
+              ("silence.wav", lambda: 0),
+          ):
+              with wave.open(name, "wb") as handle:
+                  handle.setnchannels(1)
+                  handle.setsampwidth(2)
+                  handle.setframerate(16000)
+                  handle.writeframes(b"".join(
+                      sample().to_bytes(2, "little", signed=True) for _ in range(16000)
+                  ))
           EOF
-          ./dist/shot-renamer/shot-renamer smoke.wav --show-transcript > out.txt || true
-          grep -q "no-slate" out.txt
+          ./dist/shot-renamer/shot-renamer --help > /dev/null
+          # Exit code 1 means "some files need attention", not a crash; a crash
+          # leaves out.txt empty and the grep below fails.
+          ./dist/shot-renamer/shot-renamer noise.wav --show-transcript > out.txt || true
+          grep -qE "no-slate|would-rename" out.txt
+          ./dist/shot-renamer/shot-renamer silence.wav --show-transcript > quiet.txt || true
+          grep -q "no-slate" quiet.txt
 
       - run: tar -czf "shot-renamer-${{ matrix.name }}.tar.gz" -C dist shot-renamer
 
