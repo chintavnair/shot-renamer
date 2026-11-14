@@ -90,6 +90,32 @@ It runs on CPU and CUDA without PyTorch, loads once per batch, and accepts raw
 samples, so nothing is written to disk. `--device auto` probes for CUDA and
 falls back to CPU with a warning if the system CUDA libraries are missing.
 
+## macOS
+
+Runs on Apple Silicon and Intel with macOS 11+, CPU only (the CUDA probe falls
+back to CPU silently). Neither `ffmpeg` nor Python ships with macOS:
+
+```sh
+brew install ffmpeg python@3.12
+python3.12 -m venv .venv
+.venv/bin/pip install -e .
+```
+
+`pip` resolves the newest wheels your macOS supports; on Intel or pre-Sonoma
+machines that means slightly older `onnxruntime`/`av` builds, which work the
+same.
+
+Without admin rights, micromamba gives a self-contained environment:
+
+```sh
+curl -Ls https://micro.mamba.pm/api/micromamba/osx-arm64/latest | tar -xvj bin/micromamba
+./bin/micromamba create -y -p ~/slate -c conda-forge python=3.12 ffmpeg
+~/slate/bin/python -m pip install -e .
+```
+
+The model lives in `~/.cache/huggingface` (~460 MB on first run). Copy that
+directory from another machine to avoid downloading it over a campus network.
+
 ## Development
 
 ```sh
