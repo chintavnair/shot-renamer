@@ -68,7 +68,7 @@ download.)
 ### 3. Install shot-renamer
 
 ```sh
-git clone https://github.com/<your-user>/shot-renamer.git
+git clone https://github.com/chintavnair/shot-renamer.git
 cd shot-renamer
 python3.12 -m venv .venv
 .venv/bin/pip install -e .
