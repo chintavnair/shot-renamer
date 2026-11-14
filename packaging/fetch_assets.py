@@ -26,16 +26,28 @@ MODELS = {
 
 LINUX_URL = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-{arch}-static.tar.xz"
 MAC_URL = "https://ffmpeg.martin-riedl.de/redirect/latest/macos/{arch}/release/{tool}.zip"
-LICENSE_URL = "https://www.gnu.org/licenses/gpl-3.0.txt"
+# gnu.org times out from some networks and CI runners; this mirror is stable.
+LICENSE_URL = (
+    "https://raw.githubusercontent.com/spdx/license-list-data/main/text/GPL-3.0-only.txt"
+)
 
 
-def _download(url: str, destination: Path) -> None:
-    print(f"downloading {url}")
-    # Some mirrors reject Python's default user agent with a 403.
-    request = urllib.request.Request(url, headers={"User-Agent": "shot-renamer-packaging/0.1"})
-    with urllib.request.urlopen(request, timeout=120) as response:
-        with destination.open("wb") as handle:
-            shutil.copyfileobj(response, handle)
+def _download(url: str, destination: Path, attempts: int = 3) -> None:
+    print(f"downloading {url}", flush=True)
+    for attempt in range(1, attempts + 1):
+        # Some mirrors reject Python's default user agent with a 403.
+        request = urllib.request.Request(
+            url, headers={"User-Agent": "shot-renamer-packaging/0.1"}
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                with destination.open("wb") as handle:
+                    shutil.copyfileobj(response, handle)
+            return
+        except OSError as exc:
+            if attempt == attempts:
+                raise
+            print(f"  attempt {attempt} failed ({exc}); retrying", flush=True)
 
 
 def fetch_ffmpeg(bin_dir: Path) -> None:
