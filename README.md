@@ -20,6 +20,35 @@ python3 -m venv .venv
 The first transcription downloads the Whisper model (~460 MB for `small.en`)
 into `~/.cache/huggingface`.
 
+## No-install build
+
+Releases carry a self-contained folder — Python, ffmpeg, ffprobe and the
+`small.en` model inside — so nothing needs installing: no Homebrew, no pip, no
+network on first run.
+
+```sh
+tar -xzf shot-renamer-macos-arm64.tar.gz
+./shot-renamer/shot-renamer ~/Movies/takes          # dry run
+./shot-renamer/shot-renamer ~/Movies/takes --apply
+```
+
+`.github/workflows/build.yml` builds `linux-x86_64`, `macos-arm64` and
+`macos-x86_64` bundles on every `v*` tag (or manually via workflow dispatch)
+and attaches them to the GitHub release. A bundle is about 1 GB unpacked
+(~600 MB download), mostly the model; build with
+`python packaging/fetch_assets.py --model base.en` for one roughly 300 MB
+smaller.
+
+macOS quarantines downloaded binaries, so clear the attribute once:
+
+```sh
+xattr -dr com.apple.quarantine shot-renamer
+```
+
+These builds are unsigned. On an MDM-managed machine that refuses unsigned
+software, only a copy installed by IT will run. The bundled ffmpeg is a static
+GPL build and its licence ships in `licenses/`.
+
 ## Install on macOS
 
 Runs on Apple Silicon and Intel with macOS 11+ (Sonoma or newer resolves the

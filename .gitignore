@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 build/
 dist/
+vendor/
 
 # Tool output: the audit log contains local paths
 shot-renamer-log.csv

@@ -8,6 +8,8 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
+from .resources import binary
+
 SAMPLE_RATE = 16_000
 
 
@@ -26,7 +28,7 @@ class Audio:
 def has_audio(path: Path) -> bool:
     proc = subprocess.run(
         [
-            "ffprobe", "-v", "error",
+            binary("ffprobe"), "-v", "error",
             "-select_streams", "a",
             "-show_entries", "stream=index",
             "-of", "csv=p=0",
@@ -44,7 +46,7 @@ def extract(path: Path, seconds: float = 15.0) -> Audio:
     """Decode the first ``seconds`` of audio, downmixed to mono 16 kHz."""
     proc = subprocess.run(
         [
-            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error",
+            binary("ffmpeg"), "-nostdin", "-hide_banner", "-loglevel", "error",
             "-i", str(path),
             "-t", f"{seconds:g}",
             "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE),

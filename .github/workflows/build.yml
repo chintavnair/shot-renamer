@@ -1,0 +1,67 @@
+name: build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: macos-14
+            name: macos-arm64
+          - os: macos-13
+            name: macos-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache ffmpeg and model
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: vendor-${{ matrix.name }}-small.en
+
+      - run: pip install -e . pyinstaller
+      - run: python packaging/fetch_assets.py --model small.en
+      - run: pyinstaller --noconfirm packaging/shot-renamer.spec
+
+      - name: Smoke test
+        run: |
+          ./dist/shot-renamer/shot-renamer --help > /dev/null
+          python - <<'EOF'
+          import wave
+          with wave.open("smoke.wav", "wb") as handle:
+              handle.setnchannels(1)
+              handle.setsampwidth(2)
+              handle.setframerate(16000)
+              handle.writeframes(b"\x00\x00" * 16000)
+          EOF
+          ./dist/shot-renamer/shot-renamer smoke.wav --show-transcript > out.txt || true
+          grep -q "no-slate" out.txt
+
+      - run: tar -czf "shot-renamer-${{ matrix.name }}.tar.gz" -C dist shot-renamer
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shot-renamer-${{ matrix.name }}
+          path: shot-renamer-${{ matrix.name }}.tar.gz
+          retention-days: 7
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --generate-notes
+          gh release upload "$TAG" "shot-renamer-${{ matrix.name }}.tar.gz" --clobber

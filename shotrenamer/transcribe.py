@@ -10,6 +10,7 @@ import numpy as np
 from faster_whisper import WhisperModel
 
 from .media import Audio
+from .resources import model_dir
 
 # A slate is a fixed sentence; showing the model one biases it toward the
 # vocabulary and rhythm we are looking for.
@@ -18,6 +19,10 @@ SLATE_PROMPT = "Scene 12A, Shot 3, Take 2. Marker."
 # Beyond this mean no-speech probability the clip is treated as silent. Without
 # a guard, prompt-biased decoding can invent a slate out of room tone.
 SILENCE_LIMIT = 0.75
+
+# Below this RMS the audio is dead air (about -80 dBFS). Whisper still emits
+# confident text there, echoing the prompt, so the check happens before ASR.
+SILENCE_RMS = 1e-4
 
 
 @dataclass(frozen=True)
@@ -30,6 +35,12 @@ def _samples(audio: Audio) -> np.ndarray:
     with wave.open(io.BytesIO(audio.wav), "rb") as handle:
         frames = handle.readframes(handle.getnframes())
     return np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32_768.0
+
+
+def _rms(samples: np.ndarray) -> float:
+    if samples.size == 0:
+        return 0.0
+    return float(np.sqrt(np.mean(np.square(samples))))
 
 
 def _cuda_available() -> bool:
@@ -51,7 +62,7 @@ class Transcriber:
         compute_type: str = "auto",
         prompt: str = SLATE_PROMPT,
     ) -> None:
-        self._name = model
+        self._name = model_dir(model) or model
         self._requested_device = device
         self._requested_compute = compute_type
         self._prompt = prompt
@@ -88,23 +99,27 @@ class Transcriber:
         return self._model
 
     def transcribe(self, audio: Audio) -> Transcription:
+        samples = _samples(audio)
+        if _rms(samples) < SILENCE_RMS:
+            return Transcription("", 1.0)
+
         self._ensure_model()
         try:
-            return self._run(audio)
+            return self._run(samples)
         except Exception as exc:  # noqa: BLE001 - CUDA libs can fail lazily
             if self.device != "cuda":
                 raise
             self.warning = f"CUDA transcription failed ({exc}); using CPU from here"
             self._use_cpu()
-            return self._run(audio)
+            return self._run(samples)
 
     def _use_cpu(self) -> None:
         self._model = WhisperModel(self._name, device="cpu", compute_type="int8")
         self.device, self.compute_type = "cpu", "int8"
 
-    def _run(self, audio: Audio) -> Transcription:
+    def _run(self, samples: np.ndarray) -> Transcription:
         segments, _info = self._model.transcribe(
-            _samples(audio),
+            samples,
             language="en",
             beam_size=5,
             initial_prompt=self._prompt,
